@@ -175,6 +175,45 @@ The `Determinism (TS ↔ Python)` CI job runs all three steps and is a required
 check. Comparison is string equality, never numeric closeness — "close enough"
 is precisely what makes two machines disagree about a bid score.
 
+### Contract struct types (generated from WASM)
+
+`getChannel`, `getJob`, `getRateLimitStatus`, and `getAgent` in
+[`packages/core/src/index.ts`](packages/core/src/index.ts) decode contract
+structs (`Channel`, `Job`, `RateLimit`, `AgentInfo`) into TypeScript. Those
+struct shapes are **generated**, in two steps, from the same contract WASM
+that gets deployed — not hand-maintained field by field, which is how the
+`ChannelInfo`/`RateLimitStatus` decoders previously drifted out of sync with
+the contracts and only surfaced as a type error much later (#371).
+
+```bash
+cd contracts
+./generate-specs.sh          # extract contracts/specs/*.json from the built WASM
+./generate-specs.sh --check  # fail if the committed specs are stale
+
+cd ..
+pnpm contract-types:generate # regenerate packages/core/.../generated/contract-types.ts
+                              # and python/.../generated/contract_types.py from contracts/specs/*.json
+pnpm contract-types:check    # fail if either committed file is stale
+```
+
+If you change a contract's `#[contracttype]` struct or enum:
+
+1. Make the change and run `cd contracts && ./generate-specs.sh`.
+2. Run `pnpm contract-types:generate` from the repo root and **review the
+   diff** in `packages/core/src/generated/contract-types.ts` — it shows
+   exactly which field appeared, disappeared, or changed type.
+3. Update whatever in `packages/core/src/index.ts` (or the Python SDK, once it
+   has a decode path of its own) maps the new `Raw*` shape onto the public
+   SDK type.
+
+Both checks are required CI jobs (`Contracts (Rust)`'s "Contract specs are up
+to date" step, and the `Generated contract types` job) — a struct gaining or
+losing a field fails one or the other until the steps above are run and the
+diff is reviewed. `scripts/generate-contract-types.ts` only covers the
+structs the SDKs actually decode today (`AgentInfo`, `Channel`, `Job`,
+`RateLimit`); add a contract there the day another one gains an SDK-facing
+struct.
+
 ---
 
 ## How to Contribute

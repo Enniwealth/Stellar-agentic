@@ -13,6 +13,13 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 import { fromStroops, toStroops } from './math/index.js';
+import { expectBigInt, decodeUtf8 } from './decode.js';
+import {
+  decodeAgentInfo,
+  decodeChannel,
+  decodeJob,
+  decodeRateLimit,
+} from './generated/contract-types.js';
 
 // ─── Deterministic math (re-exported for consumers) ──────────────────────────
 export * as math from './math/index.js';
@@ -96,7 +103,6 @@ import type { LedgerCloseEstimate } from './ledgerTime.js';
 import type {
   StellarAgentConfig,
   Network,
-  SpendPeriod,
   NetworkConfig,
   OpenChannelParams,
   PayForAPIParams,
@@ -431,12 +437,12 @@ export class StellarAgent {
       this.addressVal(this.address),
       xdr.ScVal.scvString(name),
     ]);
-    return this.asBigInt(result.value);
+    return expectBigInt(result.value, 'create_agent result');
   }
 
   /** Read and decode an agent registered in AgentWalletFactory. */
   async getAgent(agentId: bigint): Promise<AgentInfo> {
-    const value = this.asRecord((await this.invokeContract(
+    const raw = decodeAgentInfo((await this.invokeContract(
       this.contracts.agentWalletFactory,
       'get_agent',
       [this.u64(agentId)],
@@ -444,12 +450,12 @@ export class StellarAgent {
     )).value);
     return {
       id: agentId,
-      address: this.asString(value.address),
-      name: this.asString(value.name),
-      owner: this.asString(value.owner),
-      active: value.active === true,
-      createdAt: this.asNumber(value.created_at),
-      totalOps: this.asBigInt(value.total_ops),
+      address: raw.address,
+      name: raw.name,
+      owner: raw.owner,
+      active: raw.active,
+      createdAt: raw.created_at,
+      totalOps: raw.total_ops,
     };
   }
 
@@ -470,7 +476,7 @@ export class StellarAgent {
       this.i128(params.limitPerPeriod),
       this.enumVal(this.spendPeriodVariant(params.period)),
     ]);
-    const channelId = this.asBigInt(result.value);
+    const channelId = expectBigInt(result.value, 'open_channel result');
     this.activeChannelId = channelId;
     return channelId;
   }
@@ -593,7 +599,7 @@ export class StellarAgent {
       this.u32(deadline),
       params.arbiter ? this.addressVal(params.arbiter) : xdr.ScVal.scvVoid(),
     ]);
-    return this.asBigInt(result.value);
+    return expectBigInt(result.value, 'create_job result');
   }
 
   /**
@@ -691,7 +697,7 @@ export class StellarAgent {
     );
     return {
       spentThisPeriod: fromStroops(channel.spentThisPeriod),
-      remainingThisPeriod: fromStroops(this.asBigInt(remaining.value)),
+      remainingThisPeriod: fromStroops(expectBigInt(remaining.value, 'remaining_this_period result')),
       totalLifetime: fromStroops(channel.totalSpent),
     };
   }
@@ -700,7 +706,7 @@ export class StellarAgent {
    * Get info about a payment channel
    */
   async getChannel(channelId: bigint): Promise<ChannelInfo> {
-    const value = this.asRecord((await this.invokeContract(
+    const raw = decodeChannel((await this.invokeContract(
       this.contracts.paymentChannel,
       'get_channel',
       [this.u64(channelId)],
@@ -708,15 +714,15 @@ export class StellarAgent {
     )).value);
     return {
       id: channelId,
-      agent: this.asString(value.agent),
-      owner: this.asString(value.owner),
-      token: this.asString(value.token),
-      limitPerPeriod: this.asBigInt(value.limit_per_period),
-      period: this.spendPeriod(value.period),
-      spentThisPeriod: this.asBigInt(value.spent_this_period),
-      periodStartLedger: this.asNumber(value.period_start_ledger),
-      totalSpent: this.asBigInt(value.total_spent),
-      active: value.active === true,
+      agent: raw.agent,
+      owner: raw.owner,
+      token: raw.token,
+      limitPerPeriod: raw.limit_per_period,
+      period: raw.period,
+      spentThisPeriod: raw.spent_this_period,
+      periodStartLedger: raw.period_start_ledger,
+      totalSpent: raw.total_spent,
+      active: raw.active,
     };
   }
 
@@ -724,7 +730,7 @@ export class StellarAgent {
    * Get info about a job
    */
   async getJob(jobId: bigint): Promise<JobInfo> {
-    const value = this.asRecord((await this.invokeContract(
+    const raw = decodeJob((await this.invokeContract(
       this.contracts.escrow,
       'get_job',
       [this.u64(jobId)],
@@ -732,16 +738,16 @@ export class StellarAgent {
     )).value);
     return {
       id: jobId,
-      requester: this.asString(value.requester),
-      worker: this.optionalString(value.worker),
-      arbiter: this.optionalString(value.arbiter),
-      token: this.asString(value.token),
-      amount: this.asBigInt(value.amount),
-      taskDescription: this.decodeBytes(value.task_description),
-      result: value.result == null ? null : this.decodeBytes(value.result),
-      deadlineLedger: this.asNumber(value.deadline_ledger),
-      status: this.jobStatus(value.status),
-      createdAt: this.asNumber(value.created_at),
+      requester: raw.requester,
+      worker: raw.worker,
+      arbiter: raw.arbiter,
+      token: raw.token,
+      amount: raw.amount,
+      taskDescription: decodeUtf8(raw.task_description),
+      result: raw.result == null ? null : decodeUtf8(raw.result),
+      deadlineLedger: raw.deadline_ledger,
+      status: raw.status,
+      createdAt: raw.created_at,
     };
   }
 
@@ -773,19 +779,19 @@ export class StellarAgent {
       }
       throw error;
     }
-    const value = this.asRecord(raw.value);
+    const decoded = decodeRateLimit(raw.value);
     return {
       configured: true,
-      active: value.active === true,
-      maxPerTx: fromStroops(this.asBigInt(value.max_per_tx)),
-      maxPerHour: fromStroops(this.asBigInt(value.max_per_hour)),
-      maxPerDay: fromStroops(this.asBigInt(value.max_per_day)),
-      maxTxsPerHour: this.asNumber(value.max_txs_per_hour),
-      spentThisHour: fromStroops(this.asBigInt(value.hourly_spend)),
-      spentToday: fromStroops(this.asBigInt(value.daily_spend)),
-      txsThisHour: this.asNumber(value.hourly_tx_count),
-      hourWindowStartLedger: this.asNumber(value.hour_window_start),
-      dayWindowStartLedger: this.asNumber(value.day_window_start),
+      active: decoded.active,
+      maxPerTx: fromStroops(decoded.max_per_tx),
+      maxPerHour: fromStroops(decoded.max_per_hour),
+      maxPerDay: fromStroops(decoded.max_per_day),
+      maxTxsPerHour: decoded.max_txs_per_hour,
+      spentThisHour: fromStroops(decoded.hourly_spend),
+      spentToday: fromStroops(decoded.daily_spend),
+      txsThisHour: decoded.hourly_tx_count,
+      hourWindowStartLedger: decoded.hour_window_start,
+      dayWindowStartLedger: decoded.day_window_start,
     };
   }
 
@@ -1001,17 +1007,6 @@ export class StellarAgent {
     return xdr.ScVal.scvVec([xdr.ScVal.scvSymbol(variant)]);
   }
 
-  /** Inverse of {@link spendPeriodVariant}: `Hourly` (as a symbol vec) -> `hourly`. */
-  private spendPeriod(value: unknown): SpendPeriod {
-    const raw = Array.isArray(value) ? value[0] : value;
-    const period = String(raw).replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
-    const valid: SpendPeriod[] = ['per_ledger', 'hourly', 'daily'];
-    if (!valid.includes(period as SpendPeriod)) {
-      throw new StellarAgentError('CONTRACT_ERROR', `Unknown spend period: ${String(raw)}`);
-    }
-    return period as SpendPeriod;
-  }
-
   private spendPeriodVariant(period: OpenChannelParams['period']): string {
     return { per_ledger: 'PerLedger', hourly: 'Hourly', daily: 'Daily' }[period];
   }
@@ -1024,60 +1019,6 @@ export class StellarAgent {
         cause: error,
       });
     }
-  }
-
-  private asRecord(value: unknown): Record<string, unknown> {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      if (value instanceof Map) return Object.fromEntries(value);
-      return value as Record<string, unknown>;
-    }
-    throw new StellarAgentError('CONTRACT_ERROR', 'Contract returned a malformed struct');
-  }
-
-  private asBigInt(value: unknown): bigint {
-    if (typeof value === 'bigint') return value;
-    if (typeof value === 'number' && Number.isSafeInteger(value)) return BigInt(value);
-    if (value && typeof value === 'object' && 'value' in value) {
-      return this.asBigInt((value as { value: unknown }).value);
-    }
-    throw new StellarAgentError('CONTRACT_ERROR', 'Contract returned a malformed integer');
-  }
-
-  private asNumber(value: unknown): number {
-    const number = typeof value === 'bigint' ? Number(value) : value;
-    if (typeof number !== 'number' || !Number.isSafeInteger(number)) {
-      throw new StellarAgentError('CONTRACT_ERROR', 'Contract returned a malformed u32');
-    }
-    return number;
-  }
-
-  private asString(value: unknown): string {
-    if (typeof value === 'string') return value;
-    if (value && typeof value === 'object' && 'toString' in value) return String(value);
-    throw new StellarAgentError('CONTRACT_ERROR', 'Contract returned a malformed address');
-  }
-
-  private optionalString(value: unknown): string | null {
-    return value == null ? null : this.asString(value);
-  }
-
-  private decodeBytes(value: unknown): string {
-    if (Buffer.isBuffer(value) || value instanceof Uint8Array) {
-      return Buffer.from(value).toString('utf8');
-    }
-    throw new StellarAgentError('CONTRACT_ERROR', 'Contract returned malformed bytes');
-  }
-
-  private jobStatus(value: unknown): JobInfo['status'] {
-    const raw = Array.isArray(value) ? value[0] : value;
-    const status = String(raw).replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
-    const valid: JobInfo['status'][] = [
-      'open', 'in_progress', 'pending_release', 'completed', 'refunded', 'disputed',
-    ];
-    if (!valid.includes(status as JobInfo['status'])) {
-      throw new StellarAgentError('CONTRACT_ERROR', `Unknown job status: ${String(raw)}`);
-    }
-    return status as JobInfo['status'];
   }
 
   private errorMessage(error: unknown): string {

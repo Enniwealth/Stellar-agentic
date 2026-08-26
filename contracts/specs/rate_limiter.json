@@ -1,0 +1,250 @@
+[
+  {
+    "function_v0": {
+      "doc": "Check if a proposed payment passes rate limits.\\nReturns true if allowed, false if it would be blocked.\\nDoes NOT modify state \\xe2\\x80\\x94 call `record_payment` after a successful tx.",
+      "name": "check",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        }
+      ],
+      "outputs": [
+        "bool"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "is_active",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        "bool"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "get_limits",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "udt": {
+            "name": "RateLimit"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Emergency kill switch \\xe2\\x80\\x94 disable an agent immediately",
+      "name": "kill_agent",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Register rate limits for an agent.\\nCall this when setting up a new agent.",
+      "name": "set_limits",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "max_per_tx",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_per_hour",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_per_day",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_txs_per_hour",
+          "type_": "u32"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "Rate limit configuration for an agent",
+      "lib": "",
+      "name": "RateLimit",
+      "fields": [
+        {
+          "doc": "",
+          "name": "active",
+          "type_": "bool"
+        },
+        {
+          "doc": "The agent being rate-limited",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "daily_spend",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "day_window_start",
+          "type_": "u32"
+        },
+        {
+          "doc": "",
+          "name": "hour_window_start",
+          "type_": "u32"
+        },
+        {
+          "doc": "",
+          "name": "hourly_spend",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "hourly_tx_count",
+          "type_": "u32"
+        },
+        {
+          "doc": "Max total per day (~17280 ledgers)",
+          "name": "max_per_day",
+          "type_": "i128"
+        },
+        {
+          "doc": "Max total per hour (~720 ledgers)",
+          "name": "max_per_hour",
+          "type_": "i128"
+        },
+        {
+          "doc": "Max per single transaction",
+          "name": "max_per_tx",
+          "type_": "i128"
+        },
+        {
+          "doc": "Max number of transactions per hour",
+          "name": "max_txs_per_hour",
+          "type_": "u32"
+        },
+        {
+          "doc": "The owner who set this limit",
+          "name": "owner",
+          "type_": "address"
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Owner can update limits for an agent",
+      "name": "update_limits",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "max_per_tx",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_per_hour",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_per_day",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_txs_per_hour",
+          "type_": "u32"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Record a payment after it has been successfully executed.\\nMust be called by the payment channel or an authorized contract.",
+      "name": "record_payment",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "recorder",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        }
+      ],
+      "outputs": []
+    }
+  }
+]
+
