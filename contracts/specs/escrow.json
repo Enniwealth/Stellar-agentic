@@ -1,0 +1,350 @@
+[
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "lib": "",
+      "name": "Job",
+      "fields": [
+        {
+          "doc": "Locked payment amount",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "Optional trusted arbiter for disputes",
+          "name": "arbiter",
+          "type_": {
+            "option": {
+              "value_type": "address"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "created_at",
+          "type_": "u32"
+        },
+        {
+          "doc": "Ledger deadline \\xe2\\x80\\x94 refund available after this",
+          "name": "deadline_ledger",
+          "type_": "u32"
+        },
+        {
+          "doc": "",
+          "name": "dispute_deadline_ledger",
+          "type_": {
+            "option": {
+              "value_type": "u32"
+            }
+          }
+        },
+        {
+          "doc": "Agent requesting the work",
+          "name": "requester",
+          "type_": "address"
+        },
+        {
+          "doc": "Result submitted by worker",
+          "name": "result",
+          "type_": {
+            "option": {
+              "value_type": "bytes"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "status",
+          "type_": {
+            "udt": {
+              "name": "JobStatus"
+            }
+          }
+        },
+        {
+          "doc": "IPFS hash or description of the task",
+          "name": "task_description",
+          "type_": "bytes"
+        },
+        {
+          "doc": "Payment token",
+          "name": "token",
+          "type_": "address"
+        },
+        {
+          "doc": "Agent doing the work (set on accept)",
+          "name": "worker",
+          "type_": {
+            "option": {
+              "value_type": "address"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Requester reclaims funds if deadline passed with no result",
+      "name": "refund",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "requester",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Requester raises a dispute \\xe2\\x80\\x94 locks funds until arbiter resolves",
+      "name": "dispute",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "requester",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "get_job",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": [
+        {
+          "udt": {
+            "name": "Job"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Requester (or arbiter) releases payment to the worker",
+      "name": "release",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "releaser",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "job_count",
+      "inputs": [],
+      "outputs": [
+        "u64"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Worker agent accepts an open job",
+      "name": "accept_job",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "worker",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Create an escrow job. Locks `amount` tokens from requester.\\n\\n# Arguments\\n* `requester` - Agent requesting the work\\n* `token` - Token to pay with\\n* `amount` - Payment for completing the job\\n* `task_description` - Description / IPFS hash of what needs doing\\n* `deadline_ledger` - After this ledger, requester can claim a refund\\n* `arbiter` - Optional trusted address for dispute resolution",
+      "name": "create_job",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "requester",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "token",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "task_description",
+          "type_": "bytes"
+        },
+        {
+          "doc": "",
+          "name": "deadline_ledger",
+          "type_": "u32"
+        },
+        {
+          "doc": "",
+          "name": "arbiter",
+          "type_": {
+            "option": {
+              "value_type": "address"
+            }
+          }
+        }
+      ],
+      "outputs": [
+        "u64"
+      ]
+    }
+  },
+  {
+    "udt_union_v0": {
+      "doc": "",
+      "lib": "",
+      "name": "JobStatus",
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "Funded and waiting for a worker",
+            "name": "Open"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Worker has accepted",
+            "name": "InProgress"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Worker submitted result, awaiting release",
+            "name": "PendingRelease"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Funds released to worker \\xe2\\x80\\x94 job done",
+            "name": "Completed"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Refunded to requester",
+            "name": "Refunded"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Disputed \\xe2\\x80\\x94 waiting for arbiter",
+            "name": "Disputed"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Worker submits their result. Requester must then release or dispute.\\n\\n# Arguments\\n* `result` - Proof of work (IPFS hash, output hash, etc.)",
+      "name": "submit_result",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "worker",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "result",
+          "type_": "bytes"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Arbiter resolves a dispute",
+      "name": "resolve_dispute",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "arbiter",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "job_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "favor_worker",
+          "type_": "bool"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Wire this escrow contract up to a deployed CircuitBreaker contract.\\nThe first caller to set it becomes the admin for future rotations.",
+      "name": "set_circuit_breaker",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "circuit_breaker",
+          "type_": "address"
+        }
+      ],
+      "outputs": []
+    }
+  }
+]
+

@@ -1,0 +1,241 @@
+[
+  {
+    "function_v0": {
+      "doc": "Get the contract admin",
+      "name": "admin",
+      "inputs": [],
+      "outputs": [
+        "address"
+      ]
+    }
+  },
+  {
+    "udt_union_v0": {
+      "doc": "Events emitted by this contract",
+      "lib": "",
+      "name": "Event",
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Created"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Deactivated"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Reactivated"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Get agent info by ID",
+      "name": "get_agent",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": [
+        {
+          "udt": {
+            "name": "AgentInfo"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Initialize the factory with an admin address.\\nMust be called once after deployment.",
+      "name": "initialize",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type_": "address"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "Metadata stored on-chain for each agent wallet",
+      "lib": "",
+      "name": "AgentInfo",
+      "fields": [
+        {
+          "doc": "Whether this agent is currently active",
+          "name": "active",
+          "type_": "bool"
+        },
+        {
+          "doc": "The agent's Stellar address (its wallet)",
+          "name": "address",
+          "type_": "address"
+        },
+        {
+          "doc": "Ledger number when the agent was created",
+          "name": "created_at",
+          "type_": "u32"
+        },
+        {
+          "doc": "Human-readable name for the agent",
+          "name": "name",
+          "type_": "string"
+        },
+        {
+          "doc": "Owner who controls this agent",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "Total operations this agent has performed",
+          "name": "total_ops",
+          "type_": "u64"
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Create a new agent wallet.\\nThe caller becomes the owner of this agent.\\n\\n# Arguments\\n* `owner` - The address that will own and control this agent\\n* `agent_address` - The Stellar address of the agent's wallet\\n* `name` - A human-readable name for the agent\\n\\n# Returns\\nThe agent ID (incrementing counter)",
+      "name": "create_agent",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent_address",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "name",
+          "type_": "string"
+        }
+      ],
+      "outputs": [
+        "u64"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Total number of agents ever created",
+      "name": "total_agents",
+      "inputs": [],
+      "outputs": [
+        "u64"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Check if a specific address is a registered active agent",
+      "name": "is_active_agent",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "address",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        "bool"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Deactivate an agent. Only the owner can deactivate their agent.",
+      "name": "deactivate_agent",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Reactivate a previously deactivated agent.",
+      "name": "reactivate_agent",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Increment the operation counter for an agent.\\nCalled by the PaymentChannel contract after a successful payment.",
+      "name": "record_operation",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Get all agents owned by a specific address",
+      "name": "get_agents_by_owner",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "vec": {
+            "element_type": {
+              "udt": {
+                "name": "AgentInfo"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+]
+

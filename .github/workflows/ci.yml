@@ -50,6 +50,40 @@ jobs:
       - name: Build WASM (deployable target)
         run: cargo build --target wasm32v1-none --release
 
+      # `generate-specs.sh` shells out to it to read each contract's interface
+      # (structs, enums, functions) straight from the built WASM. Installed
+      # from the project's published release binary rather than `cargo
+      # install` — that compiles from source against whatever `ethnum` version
+      # its Cargo.lock happens to pin, which for 25.1.0 fails to build under a
+      # current stable rustc (E0512, a transmute-size check `ethnum` 1.5.2
+      # trips that newer releases don't). The prebuilt binary sidesteps that
+      # entirely and is far faster besides. Cached on its own key since
+      # Swatinem/rust-cache does not cache installed binaries under
+      # ~/.cargo/bin.
+      - name: Cache stellar-cli
+        id: cache-stellar-cli
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/stellar
+          key: ${{ runner.os }}-stellar-cli-25.1.0-bin
+
+      - name: Install stellar-cli
+        if: steps.cache-stellar-cli.outputs.cache-hit != 'true'
+        run: |
+          curl -sL -o /tmp/stellar-cli.tar.gz \
+            https://github.com/stellar/stellar-cli/releases/download/v25.1.0/stellar-cli-25.1.0-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf /tmp/stellar-cli.tar.gz -C ~/.cargo/bin
+          chmod +x ~/.cargo/bin/stellar
+
+      # The fix for #371: a contract's #[contracttype] struct or enum is the
+      # single source of truth for what packages/core/src/generated/
+      # contract-types.ts and the Python equivalent decode. If a struct gained
+      # or lost a field since contracts/specs/*.json was last committed, this
+      # fails here — before it can surface downstream as a type error, the way
+      # the ChannelInfo/RateLimitStatus breakages this issue describes did.
+      - name: Contract specs are up to date with the built WASM
+        run: ./generate-specs.sh --check
+
   # ── TypeScript packages ───────────────────────────────────────────────────
   #
   # Monorepo packages live under packages/ (@stellaragent/core, cli, react).
@@ -99,6 +133,43 @@ jobs:
 
       - name: Build, lint, typecheck, and test
         run: pnpm turbo run build lint typecheck test ${TURBO_FILTERS}
+
+  # ── Generated contract types ──────────────────────────────────────────────
+  #
+  # packages/core/src/generated/contract-types.ts and
+  # python/src/stellaragent/generated/contract_types.py are generated from
+  # contracts/specs/*.json (see scripts/generate-contract-types.ts and #371).
+  # This job needs no Rust toolchain — it only reads the committed spec
+  # JSON — so it is the fast half of the CI gate: the `contracts` job's
+  # `generate-specs.sh --check` catches a spec gone stale against the built
+  # WASM, and this catches the generated SDK types gone stale against the
+  # spec. Either one failing means a contract struct's shape changed and the
+  # SDK has not caught up yet.
+  contract-types:
+    name: Generated contract types
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Version is taken from the "packageManager" field in package.json.
+        # Passing "version" here as well makes the action abort with
+        # ERR_PNPM_BAD_PM_VERSION ("Multiple versions of pnpm specified").
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generated TS/Python contract types are up to date
+        run: pnpm contract-types:check
 
   # ── Rust SDK ──────────────────────────────────────────────────────────────
   #

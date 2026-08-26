@@ -185,6 +185,10 @@ describe('shared Soroban invocation pipeline', () => {
             period_start_ledger: 700,
             total_spent: 20n,
             active: true,
+            allocated: 0n,
+            collateral: 100n,
+            dispute_ledgers: 17280,
+            voucher_signer: null,
           },
           get_job: {
             requester: TEST_PUBLIC,
@@ -197,8 +201,11 @@ describe('shared Soroban invocation pipeline', () => {
             deadline_ledger: 99,
             status: ['PendingRelease'],
             created_at: 8,
+            dispute_deadline_ledger: null,
           },
           get_limits: {
+            agent: TEST_PUBLIC,
+            owner: TEST_PUBLIC,
             max_per_tx: 10_000_000n,
             max_per_hour: 20_000_000n,
             max_per_day: 30_000_000n,

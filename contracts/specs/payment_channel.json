@@ -1,0 +1,935 @@
+[
+  {
+    "function_v0": {
+      "doc": "Agent executes a payment to a recipient.\\nEnforces the spend limit for the current period.\\n\\n# Arguments\\n* `agent` - Must be the authorized agent for this channel\\n* `channel_id` - Which channel to spend from\\n* `recipient` - Who receives the payment\\n* `amount` - How much to send\\n* `memo` - Optional memo (e.g. API endpoint being paid for)",
+      "name": "pay",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "memo",
+          "type_": "bytes"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Owner tops up a channel with more tokens",
+      "name": "top_up",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Wire this channel contract up to a deployed AMM/DEX contract, used\\nby `pay_with_conversion` to actually execute cross-asset swaps. The\\nfirst caller to set it becomes the admin for future rotations,\\nmirroring `set_circuit_breaker`.",
+      "name": "set_amm",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amm",
+          "type_": "address"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Reserve collateral for voucher settlement with one recipient.\\n\\nOne transaction per `(channel, recipient)` pair, once \\xe2\\x80\\x94 not per payment.\\nThis is what makes \"a payout never exceeds the deposit\" hold by\\nconstruction: `collateral - allocated` is all the on-chain `pay` path may\\ntouch, and a voucher may never claim more than its allocation, so the sum\\nof everything that can leave is bounded by the collateral.\\n\\nIncreases an existing allocation rather than replacing it, so topping up\\na busy recipient does not require settling first.",
+      "name": "allocate",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Pay out an expired close. Callable by anyone \\xe2\\x80\\x94 there is nothing left to\\ndecide, and requiring a specific caller would let one side stall.",
+      "name": "finalize",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Replace the voucher an open close will pay, with a larger one.\\n\\nNo authorisation: the signature *is* the authority, and requiring one\\nwould stop a watchtower challenging on a recipient's behalf \\xe2\\x80\\x94 which is\\nprecisely what watchtowers are for.\\n\\nThe window does not reset. Resetting would let a payer hold a channel\\nopen indefinitely by drip-feeding vouchers one stroop apart.",
+      "name": "challenge",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "sequence",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "cumulative_amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "signature",
+          "type_": {
+            "bytes_n": {
+              "n": 64
+            }
+          }
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "A configured payment channel authorizing an agent to spend",
+      "lib": "",
+      "name": "Channel",
+      "fields": [
+        {
+          "doc": "Whether this channel is open",
+          "name": "active",
+          "type_": "bool"
+        },
+        {
+          "doc": "Agent address authorized to spend",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "Sum of the per-recipient voucher allocations currently reserved.\\n\\n`collateral - allocated` is what the on-chain `pay` path may spend.\\nKeeping the two apart is what makes \"a voucher payout never exceeds the\\ndeposit\" provable rather than incidental.",
+          "name": "allocated",
+          "type_": "i128"
+        },
+        {
+          "doc": "Tokens this contract actually holds for this channel.\\n\\nAdded by the voucher work, and a bug fix in its own right: before it,\\n`open_channel`'s `deposit` was validated, transferred and then never\\nstored, so every channel drew on one commingled pool and `total_spent`\\nwas bounded by nothing \\xe2\\x80\\x94 `spent_this_period` resets each period, so an\\nagent could spend `limit_per_period` per period indefinitely out of\\nother owners' deposits. Nothing can pay out more than this.",
+          "name": "collateral",
+          "type_": "i128"
+        },
+        {
+          "doc": "Ledgers a unilateral close stays open for challenge.",
+          "name": "dispute_ledgers",
+          "type_": "u32"
+        },
+        {
+          "doc": "Max spend per period (in stroops / token base units)",
+          "name": "limit_per_period",
+          "type_": "i128"
+        },
+        {
+          "doc": "Owner who funded this channel",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "Period type",
+          "name": "period",
+          "type_": {
+            "udt": {
+              "name": "SpendPeriod"
+            }
+          }
+        },
+        {
+          "doc": "Ledger number when current period started",
+          "name": "period_start_ledger",
+          "type_": "u32"
+        },
+        {
+          "doc": "Amount spent in the current period",
+          "name": "spent_this_period",
+          "type_": "i128"
+        },
+        {
+          "doc": "Token contract address (e.g. USDC)",
+          "name": "token",
+          "type_": "address"
+        },
+        {
+          "doc": "Total lifetime spend through this channel",
+          "name": "total_spent",
+          "type_": "i128"
+        },
+        {
+          "doc": "Ed25519 public key authorised to sign vouchers for this channel.\\n\\n`None` until `enable_vouchers`. Explicit rather than derived from\\n`agent`: a contract cannot recover a key from an `Address`, and keeping\\nthe voucher key separate from the on-chain identity means it can live in\\na signing service and rotate independently.",
+          "name": "voucher_signer",
+          "type_": {
+            "option": {
+              "value_type": {
+                "bytes_n": {
+                  "n": 32
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "udt_union_v0": {
+      "doc": "Keys for per-`(channel, recipient)` state.\\n\\nPersistent storage under composite keys rather than another `Map` on the\\ninstance: the existing `channels` map is loaded and re-serialised in full on\\nevery `pay`, which is a cost that grows with the number of channels and a\\npattern this work should not extend.",
+      "lib": "",
+      "name": "DataKey",
+      "cases": [
+        {
+          "tuple_v0": {
+            "doc": "Reserved collateral for a recipient.",
+            "name": "Allocation",
+            "type_": [
+              "u64",
+              "address"
+            ]
+          }
+        },
+        {
+          "tuple_v0": {
+            "doc": "An in-flight close for a recipient.",
+            "name": "Settlement",
+            "type_": [
+              "u64",
+              "address"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "get_channel",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": [
+        {
+          "udt": {
+            "name": "Channel"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Open a payment channel for an agent.\\nOwner deposits tokens and sets a per-period spend limit.\\n\\n# Arguments\\n* `owner` - Who is funding the channel\\n* `agent` - The AI agent authorized to spend\\n* `token` - Token contract address (USDC, XLM, etc.)\\n* `deposit` - Initial deposit amount\\n* `limit_per_period` - Max the agent can spend per period\\n* `period` - Reset period (Hourly, Daily, etc.)",
+      "name": "open_channel",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "token",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "deposit",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "limit_per_period",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "period",
+          "type_": {
+            "udt": {
+              "name": "SpendPeriod"
+            }
+          }
+        }
+      ],
+      "outputs": [
+        "u64"
+      ]
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "Collateral reserved for voucher settlement with one recipient.",
+      "lib": "",
+      "name": "Allocation",
+      "fields": [
+        {
+          "doc": "Reserved amount. A voucher may never claim more than this.",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "Paid out so far. Non-zero only after `finalize`.",
+          "name": "settled",
+          "type_": "i128"
+        }
+      ]
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "A close in flight for one `(channel, recipient)` pair.",
+      "lib": "",
+      "name": "Settlement",
+      "fields": [
+        {
+          "doc": "Amount of the best voucher seen. This is what gets paid.",
+          "name": "best_cumulative",
+          "type_": "i128"
+        },
+        {
+          "doc": "Sequence of the best voucher seen. Audit only \\xe2\\x80\\x94 see `voucher::supersedes`.",
+          "name": "best_sequence",
+          "type_": "u64"
+        },
+        {
+          "doc": "Whether the payer side opened it, and can therefore be penalised.",
+          "name": "closed_by_payer",
+          "type_": "bool"
+        },
+        {
+          "doc": "When the window opened.",
+          "name": "opened_at_ledger",
+          "type_": "u32"
+        },
+        {
+          "doc": "What the closer originally submitted, for computing the penalty.",
+          "name": "opened_cumulative",
+          "type_": "i128"
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Owner closes a channel and reclaims unspent funds",
+      "name": "close_channel",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Return unreserved collateral to the owner without closing the channel.\\n\\nAlso the sweep for what is left after allocations finalise, which is why\\nit is callable on a closed channel.",
+      "name": "withdraw_free",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "udt_union_v0": {
+      "doc": "Period over which a spend limit resets",
+      "lib": "",
+      "name": "SpendPeriod",
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "Per-ledger limit (useful for testing)",
+            "name": "PerLedger"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Hourly limit (~720 ledgers at 5s each)",
+            "name": "Hourly"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Daily limit (~17280 ledgers)",
+            "name": "Daily"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Collateral reserved for one recipient, and what it has paid out.",
+      "name": "get_allocation",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "udt": {
+            "name": "Allocation"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "The close in flight for one recipient, if there is one.",
+      "name": "get_settlement",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "option": {
+            "value_type": {
+              "udt": {
+                "name": "Settlement"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Authorise an Ed25519 key to mint vouchers for this channel, and set the\\nchallenge window.\\n\\nSeparate from `open_channel` on purpose: the existing signature stays\\nuntouched, so every caller that does not want vouchers is unaffected.\\n\\nRe-calling rotates the key. Rotation is deliberately allowed while\\nallocations are outstanding \\xe2\\x80\\x94 a compromised voucher key is exactly when\\nyou most need to revoke it, and vouchers already signed under the old\\nkey stop verifying immediately. That is the intended blast radius: an\\nowner who rotates also repudiates anything the old key signed and has\\nnot yet settled.",
+      "name": "enable_vouchers",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "voucher_signer",
+          "type_": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "dispute_ledgers",
+          "type_": "u32"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Collateral not reserved for any voucher allocation \\xe2\\x80\\x94 what the on-chain\\n`pay` path may spend, and what `withdraw_free` would return.",
+      "name": "free_collateral",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Admin-only: install (or rotate) the Groth16 verifying key used by\\n`verify_solvency_proof`. The first caller to set it becomes the\\nadmin for future rotations, mirroring `set_circuit_breaker`.",
+      "name": "set_solvency_vk",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "vk",
+          "type_": {
+            "udt": {
+              "name": "SolvencyVerifyingKey"
+            }
+          }
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "A single payment record",
+      "lib": "",
+      "name": "PaymentRecord",
+      "fields": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "ledger",
+          "type_": "u32"
+        },
+        {
+          "doc": "",
+          "name": "memo",
+          "type_": "bytes"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "token",
+          "type_": "address"
+        }
+      ]
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "A Groth16 proof for the solvency circuit.",
+      "lib": "",
+      "name": "SolvencyProof",
+      "fields": [
+        {
+          "doc": "",
+          "name": "a",
+          "type_": {
+            "bytes_n": {
+              "n": 96
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "b",
+          "type_": {
+            "bytes_n": {
+              "n": 192
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "c",
+          "type_": {
+            "bytes_n": {
+              "n": 96
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Close with a voucher, opening a challenge window.\\n\\nAnyone holding a valid voucher may call this, including the payer. That\\nis the point: a recipient must be able to settle when the payer goes\\ndark, and a payer must be able to reclaim collateral when the recipient\\ndoes. The window is what keeps a payer from using it to pay less than\\nthey owe.",
+      "name": "close_unilateral",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "closer",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "sequence",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "cumulative_amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "signature",
+          "type_": {
+            "bytes_n": {
+              "n": 64
+            }
+          }
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Wire this channel contract up to a deployed `PriceOracle` contract,\\nused by `pay_with_conversion` as the trusted reference price for\\ncross-asset conversions. The first caller to set it becomes the\\nadmin for future rotations, mirroring `set_circuit_breaker`.",
+      "name": "set_price_oracle",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "price_oracle",
+          "type_": "address"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Settle a voucher immediately, with both sides agreeing.\\n\\nNothing is in dispute, so nothing waits. This is the path that should be\\ntaken almost always, and it costs one transaction for any number of\\noff-chain payments.\\n\\n\"Mutual signature\" is expressed as two authorisations: the voucher\\ncarries the payer's, and `owner` plus `recipient` both authorise this\\ncall. A close nobody disputes needs no window.",
+      "name": "close_cooperative",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "sequence",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "cumulative_amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "signature",
+          "type_": {
+            "bytes_n": {
+              "n": 64
+            }
+          }
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Agent executes a payment where the recipient wants a different asset\\nthan the channel's settlement token (`channel.token`) \\xe2\\x80\\x94 e.g. the\\nchannel is funded in USDC but this recipient only accepts XLM.\\n\\n# Design: normalization stays in `channel.token`, not a new unit\\n\\n`amount` here is in `channel.token` units, exactly like `pay()`'s\\n`amount`. The spend limit (`limit_per_period` / `spent_this_period`)\\nis therefore *already* normalized: it's always measured in the one\\nasset this channel ever actually custodies (deposited at\\n`open_channel` / `top_up`), regardless of which asset the recipient\\nends up receiving. There's no need to invent a separate reference\\nunit for the ledger itself, and doing so would risk changing\\nsame-asset `pay()` behavior \\xe2\\x80\\x94 which must stay identical.\\n\\n# Design: what the price oracle is actually for\\n\\nWhat *isn't* automatically safe is the conversion itself. This\\ncontract calls out to a configured AMM (`set_amm`) to swap\\n`channel.token` -> `dest_token`. An AMM's on-chain quote can be\\nmanipulat",
+      "name": "pay_with_conversion",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "dest_token",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "min_received",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "memo",
+          "type_": "bytes"
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Wire this channel contract up to a deployed CircuitBreaker contract.\\nThe first caller to set it becomes the admin for future rotations.",
+      "name": "set_circuit_breaker",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "circuit_breaker",
+          "type_": "address"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "remaining_this_period",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Verifies a Groth16 proof that some private payment history is\\nconsistent with this channel's own public `limit_per_period` and\\n`total_spent` \\xe2\\x80\\x94 i.e. that some ordering of undisclosed payments into\\nspend-limit periods never exceeded the limit, and summed to exactly\\nthe channel's recorded total. Returns `true`/`false`; never panics\\non a bad proof (only if no verifying key has been configured).\\n\\nSee `zk/solvency_proof` for the prover and `docs/zk-solvency-design.md`\\nfor the full circuit description.",
+      "name": "verify_solvency_proof",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "channel_id",
+          "type_": "u64"
+        },
+        {
+          "doc": "",
+          "name": "proof",
+          "type_": {
+            "udt": {
+              "name": "SolvencyProof"
+            }
+          }
+        }
+      ],
+      "outputs": [
+        "bool"
+      ]
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "A Groth16 verifying key for the solvency circuit (see\\n`zk/solvency_proof`), encoded as native BLS12-381 points so it can be\\nchecked on-chain via `env.crypto().bls12_381().pairing_check`.\\n\\n`gamma_abc_g1` must have exactly 3 entries: the constant term followed\\nby one entry per public input (`limit_per_period`, `total_spent`, in\\nthat order), per the circuit's declared public inputs.",
+      "lib": "",
+      "name": "SolvencyVerifyingKey",
+      "fields": [
+        {
+          "doc": "",
+          "name": "alpha_g1",
+          "type_": {
+            "bytes_n": {
+              "n": 96
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "beta_g2",
+          "type_": {
+            "bytes_n": {
+              "n": 192
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "delta_g2",
+          "type_": {
+            "bytes_n": {
+              "n": 192
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "gamma_abc_g1",
+          "type_": {
+            "vec": {
+              "element_type": {
+                "bytes_n": {
+                  "n": 96
+                }
+              }
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "gamma_g2",
+          "type_": {
+            "bytes_n": {
+              "n": 192
+            }
+          }
+        }
+      ]
+    }
+  }
+]
+
