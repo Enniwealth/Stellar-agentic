@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from stellaragent.integrations.langchain_tools import StellarAgentLangChainTools, TOOL_NAMES
+from stellaragent.integrations.langchain_tools import TOOL_NAMES, StellarAgentLangChainTools
 from stellaragent.integrations.policy import PaymentPolicy, ToolContext
 
 

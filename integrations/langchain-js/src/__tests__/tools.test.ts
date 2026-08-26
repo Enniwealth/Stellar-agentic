@@ -100,7 +100,7 @@ describe('StellarAgentToolKit parity', () => {
 
 describe('StellarAgentToolKit error surface', () => {
   it('surfaces typed ToolError codes to callers', () => {
-    const err = new ToolError('PAYMENT_REFUSED', 'blocked', { reasons: ['session_budget_exceeded'] });
+    const err = new ToolError('PAYMENT_REFUSED', 'blocked', { reasons: ['recipient_not_allowed'] });
     expect(err.toJSON().code).toBe('PAYMENT_REFUSED');
   });
 });

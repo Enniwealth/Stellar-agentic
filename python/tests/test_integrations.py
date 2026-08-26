@@ -1,9 +1,9 @@
 """Tests for Python integration adapters."""
 
 from stellaragent.integrations.errors import payment_refused
-from stellaragent.integrations.langchain_tools import StellarAgentLangChainTools, TOOL_NAMES
-from stellaragent.integrations.policy import PaymentPolicy, ToolContext
+from stellaragent.integrations.langchain_tools import TOOL_NAMES, StellarAgentLangChainTools
 from stellaragent.integrations.llamaindex_tools import LlamaIndexToolSpec
+from stellaragent.integrations.policy import PaymentPolicy, ToolContext
 from stellaragent.math.predict import (
     ChannelSpendState,
     PredictPaymentOutcomeParams,

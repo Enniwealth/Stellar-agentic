@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from stellaragent.integrations.errors import ToolError, payment_refused
 from stellaragent.integrations.handlers import (
-    HandlerContext,
     TOOL_SCHEMAS,
+    HandlerContext,
     create_handler_context,
     dispatch_tool_handler,
     to_agent_result,
 )
-from stellaragent.integrations.policy import PaymentPolicy, ToolContext
-from stellaragent.math.predict import PaymentPrediction, PredictPaymentOutcomeParams, predict_payment_outcome
+from stellaragent.integrations.policy import ToolContext
+from stellaragent.math.predict import (
+    PaymentPrediction,
+    PredictPaymentOutcomeParams,
+    predict_payment_outcome,
+)
 
 TOOL_NAMES = list(TOOL_SCHEMAS.keys())
 
