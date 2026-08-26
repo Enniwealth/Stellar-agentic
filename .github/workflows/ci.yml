@@ -51,19 +51,29 @@ jobs:
         run: cargo build --target wasm32v1-none --release
 
       # `generate-specs.sh` shells out to it to read each contract's interface
-      # (structs, enums, functions) straight from the built WASM. Cached on its
-      # own key — `cargo install` from source takes several minutes, and
-      # Swatinem/rust-cache does not cache installed binaries under ~/.cargo/bin.
+      # (structs, enums, functions) straight from the built WASM. Installed
+      # from the project's published release binary rather than `cargo
+      # install` — that compiles from source against whatever `ethnum` version
+      # its Cargo.lock happens to pin, which for 25.1.0 fails to build under a
+      # current stable rustc (E0512, a transmute-size check `ethnum` 1.5.2
+      # trips that newer releases don't). The prebuilt binary sidesteps that
+      # entirely and is far faster besides. Cached on its own key since
+      # Swatinem/rust-cache does not cache installed binaries under
+      # ~/.cargo/bin.
       - name: Cache stellar-cli
         id: cache-stellar-cli
         uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/stellar
-          key: ${{ runner.os }}-stellar-cli-25.1.0
+          key: ${{ runner.os }}-stellar-cli-25.1.0-bin
 
       - name: Install stellar-cli
         if: steps.cache-stellar-cli.outputs.cache-hit != 'true'
-        run: cargo install --locked stellar-cli --version 25.1.0
+        run: |
+          curl -sL -o /tmp/stellar-cli.tar.gz \
+            https://github.com/stellar/stellar-cli/releases/download/v25.1.0/stellar-cli-25.1.0-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf /tmp/stellar-cli.tar.gz -C ~/.cargo/bin
+          chmod +x ~/.cargo/bin/stellar
 
       # The fix for #371: a contract's #[contracttype] struct or enum is the
       # single source of truth for what packages/core/src/generated/
