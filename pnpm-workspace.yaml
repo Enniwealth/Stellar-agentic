@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
   - 'packages/react/example'
+  - 'integrations/*'
   - dashboard
 allowBuilds:
   esbuild: true
