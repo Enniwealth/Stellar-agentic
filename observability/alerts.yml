@@ -1,0 +1,20 @@
+groups:
+  - name: stellaragent
+    rules:
+      - alert: IndexerLagHigh
+        expr: stellaragent_indexer_lag_ledgers > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Indexer lag exceeds 50 ledgers"
+          description: "The Soroban event indexer is {{ $value }} ledgers behind."
+
+      - alert: PaymentFailureRateHigh
+        expr: rate(stellaragent_payment_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payment failure rate elevated"
+          description: "More than 10% of payments are failing over the last 5 minutes."

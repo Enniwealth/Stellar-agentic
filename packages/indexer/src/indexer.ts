@@ -1,6 +1,8 @@
 import { SorobanRpc } from "@stellar/stellar-sdk";
 import { decodeEvent } from "./decoder.js";
 import { EventStore } from "./store.js";
+import { createIndexerTelemetry, instrumentIndexRun, instrumentDecodedEvent } from "./telemetry.js";
+import type { IndexerTelemetry } from "./telemetry.js";
 import type {
   ContractAddresses,
   ContractKind,
@@ -20,6 +22,8 @@ export interface IndexerOptions {
   pageSize?: number;
   pollIntervalMs?: number;
   allowHttp?: boolean;
+  /** Enable tracing and metrics for the ingest pipeline. */
+  telemetry?: boolean | { otlpEndpoint?: string; serviceName?: string };
 }
 
 export interface IndexResult {
@@ -37,6 +41,7 @@ export class SorobanEventIndexer {
   private readonly finalityLag: number;
   private readonly pageSize: number;
   private readonly pollIntervalMs: number;
+  private readonly telemetry: IndexerTelemetry;
   private stopped = false;
 
   constructor(options: IndexerOptions) {
@@ -58,13 +63,35 @@ export class SorobanEventIndexer {
     this.finalityLag = options.finalityLag ?? 1;
     this.pageSize = options.pageSize ?? 100;
     this.pollIntervalMs = options.pollIntervalMs ?? 5_000;
+    const tel = options.telemetry;
+    this.telemetry = createIndexerTelemetry(
+      typeof tel === "object" ? { enabled: true, ...tel } : { enabled: tel ?? false },
+    );
   }
 
   async catchUp(fromLedger?: number): Promise<IndexResult> {
-    return this.runOnce(fromLedger);
+    const result = await instrumentIndexRun(this.telemetry, () =>
+      this.runOnceInternal(fromLedger),
+    );
+    return {
+      fromLedger: result.fromLedger,
+      throughLedger: result.throughLedger,
+      eventCount: result.eventCount,
+    };
   }
 
   async runOnce(fromLedgerOverride?: number): Promise<IndexResult> {
+    const result = await this.runOnceInternal(fromLedgerOverride);
+    return {
+      fromLedger: result.fromLedger,
+      throughLedger: result.throughLedger,
+      eventCount: result.eventCount,
+    };
+  }
+
+  private async runOnceInternal(fromLedgerOverride?: number): Promise<
+    IndexResult & { decodeFailures: number; latestLedger: number }
+  > {
     if (
       fromLedgerOverride !== undefined &&
       (!Number.isSafeInteger(fromLedgerOverride) || fromLedgerOverride < 1)
@@ -104,11 +131,30 @@ export class SorobanEventIndexer {
     } while (cursor);
 
     const throughLedger = Math.max(fromLedger - 1, latestLedger - this.finalityLag);
+    let decodeFailures = 0;
     const decoded = rawEvents
       .filter((event) => event.ledger <= throughLedger)
-      .map((event) => this.decode(event));
+      .map((event) => {
+        try {
+          return instrumentDecodedEvent(this.telemetry, this.decode(event));
+        } catch (error) {
+          decodeFailures += 1;
+          this.telemetry.logger.warn("decode failure", {
+            eventId: event.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        }
+      })
+      .filter((event): event is DecodedEvent => event !== null);
     this.store.replaceRange(fromLedger, throughLedger, decoded);
-    return { fromLedger, throughLedger, eventCount: decoded.length };
+    return {
+      fromLedger,
+      throughLedger,
+      eventCount: decoded.length,
+      decodeFailures,
+      latestLedger,
+    };
   }
 
   async liveTail(signal?: AbortSignal): Promise<void> {

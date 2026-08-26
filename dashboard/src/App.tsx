@@ -5,6 +5,7 @@ import { AgentsPage } from './pages/AgentsPage.js';
 import { PaymentsPage } from './pages/PaymentsPage.js';
 import { JobsPage } from './pages/JobsPage.js';
 import { AlertsPage } from './pages/AlertsPage.js';
+import { HealthPage } from './pages/HealthPage.js';
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -40,6 +41,7 @@ export function App() {
             <Route path="/jobs" element={<JobsPage />} />
             <Route path="/limits" element={<PlaceholderPage title="Rate Limits" />} />
             <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/health" element={<HealthPage />} />
             <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
           </Routes>
         </main>

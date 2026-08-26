@@ -95,6 +95,19 @@ export interface StellarAgentConfig {
    * @default false
    */
   allowUnconfiguredContracts?: boolean;
+  /**
+   * OpenTelemetry tracing, metrics, and logging. When omitted or
+   * `{ enabled: false }`, telemetry is a no-op with zero overhead.
+   */
+  telemetry?: {
+    enabled?: boolean;
+    serviceName?: string;
+    otlpEndpoint?: string;
+    logLevel?: 'debug' | 'info' | 'warn' | 'error';
+    /** Test-only injection — not for production use. */
+    tracer?: import('../telemetry/tracer.js').Tracer;
+    metrics?: import('../telemetry/metrics.js').Metrics;
+  };
 }
 
 export interface AgentInfo {
