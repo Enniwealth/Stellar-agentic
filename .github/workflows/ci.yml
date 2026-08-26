@@ -101,6 +101,9 @@ jobs:
         --filter=@stellaragent/cli
         --filter=@stellaragent/react
         --filter=@stellaragent/indexer
+        --filter=@stellaragent/integration-shared
+        --filter=@stellaragent/mcp-server
+        --filter=@stellaragent/langchain
 
     steps:
       - uses: actions/checkout@v4
