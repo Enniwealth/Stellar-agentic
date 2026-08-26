@@ -66,6 +66,7 @@ jobs:
         --filter=@stellaragent/core
         --filter=@stellaragent/cli
         --filter=@stellaragent/react
+        --filter=@stellaragent/indexer
 
     steps:
       - uses: actions/checkout@v4
